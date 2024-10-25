@@ -1,0 +1,198 @@
+---
+title: "Preliminary Data Analysis"
+format: html
+editor: visual
+---
+
+## Read in Data
+
+```{r, echo = FALSE, warning=FALSE}
+library(readxl)
+library(tidyverse)
+library(patchwork)
+demographic_query <- read_excel("~/Desktop/Fall 2024/Aspiranet/Data/Demographic Query Last 3 Years.xlsx")
+incidents <- read_excel("~/Desktop/Fall 2024/Aspiranet/Data/Incidents Last 3 years with Demographic Information Revised With County of Service.xlsx")
+cans_last_years <- read_excel("~/Desktop/Fall 2024/Aspiranet/Data/CANS Last 3 years with Demographic Information.xlsx")
+cancelled_apts <- read_excel("~/Desktop/Fall 2024/Aspiranet/Data/Cancelled Appointments Last 3 years with Demographic Information Revised With County of Service.xlsx")
+```
+
+## Demographic Analysis
+
+```{r}
+demographic_query |>
+  count(Ethnicity) |> 
+  ggplot(aes(reorder(Ethnicity, -n),n)) +
+  geom_bar(stat="identity", fill = "white", color = "black") + 
+  geom_text(aes(label=n),position = position_fill(vjust = 75)) + coord_flip()
+age <- demographic_query |>
+  ggplot(aes(x = AgeAtStart, fill = Gender)) + geom_histogram()
+lang <-demographic_query |>
+  count(PrimaryLanguage) |> 
+  ggplot(aes(reorder(PrimaryLanguage, -n),n)) +
+  geom_bar(stat="identity", fill = "white", color = "black") + 
+  geom_text(aes(label=n),position = position_fill(vjust = 200)) + coord_flip()
+religion <- demographic_query |>
+  ggplot(aes(x = Religion)) + geom_bar() + coord_flip()
+service <- demographic_query |>
+  ggplot(aes(x = ServiceDivision)) + geom_bar() + coord_flip()
+(age+lang)/(religion+service)
+```
+
+```{r}
+demographic_query |>
+  group_by(OptionsNumber) |>
+  summarize(n = n()) |>
+  arrange(desc(n))
+demographic_query |>
+  select(OptionsNumber:Religion) |>
+  unique() |>
+  group_by(OptionsNumber) |>
+  mutate(n = n()) |>
+  ungroup() |>
+  arrange(desc(n))
+```
+
+## Incident Analysis
+
+```{r}
+incidents |>
+  ggplot(aes(x = AgeAtIncident)) + geom_histogram() + facet_wrap(~IncidentType)
+
+incidents <- incidents |>
+  mutate(AgeRange = case_when(
+    AgeAtIncident <= 5 ~ "0-5",
+    AgeAtIncident <= 10 ~ "6-9",
+    AgeAtIncident <= 15 ~ "10-14",
+    AgeAtIncident <= 20 ~ "15-19",
+    AgeAtIncident <= 25 ~ "20-24",
+    AgeAtIncident <= 30 ~ "25-30",
+    AgeAtIncident <= 35 ~ "31-35",
+    .default = "35+"))
+
+```
+
+### Ages 0 to 5
+
+```{r}
+incidents |>
+  filter(AgeRange == "0-5") |>
+  group_by(IncidentType) |>
+  mutate(n = n()) |>
+  ungroup() |>
+  ggplot(aes(x=reorder(IncidentType,n), fill =as.factor(AgeAtIncident))) +
+  geom_bar() + coord_flip() + ggtitle("Incident Type for Ages 0 - 5")
+```
+
+### Ages 6 to 9
+
+```{r}
+incidents |>
+  filter(AgeRange == "6-9") |>
+  group_by(IncidentType) |>
+  mutate(n = n()) |>
+  ungroup() |>
+  filter(n > 15) |>
+  ggplot(aes(x=reorder(IncidentType,n), fill =as.factor(AgeAtIncident))) +
+  geom_bar() + coord_flip() + ggtitle("Top Incident Type for Ages 5 - 9")
+```
+
+### Ages 10 to 14
+
+```{r}
+incidents |>
+  filter(AgeRange == "10-14") |>
+  group_by(IncidentType) |>
+  mutate(n = n()) |>
+  ungroup() |>
+  filter(n > 50) |>
+  ggplot(aes(x=reorder(IncidentType,n), fill =as.factor(AgeAtIncident))) +
+  geom_bar() + coord_flip() + ggtitle("Top Incident Type for Ages 10 - 14")
+
+```
+
+### Ages 15 to 19
+
+```{r}
+incidents |>
+  filter(AgeRange == "15-19") |>
+  group_by(IncidentType) |>
+  mutate(n = n()) |>
+  ungroup() |>
+  filter(n > 25) |>
+  ggplot(aes(x=reorder(IncidentType,n), fill =as.factor(AgeAtIncident))) +
+  geom_bar() + coord_flip() + ggtitle("Incident Type for Ages 15 - 19")
+```
+
+### Ages 20 to 24
+
+```{r}
+incidents |>
+  filter(AgeRange == "20-24") |>
+  group_by(IncidentType) |>
+  mutate(n = n()) |>
+  ungroup() |>
+  ggplot(aes(x=reorder(IncidentType,n), fill =as.factor(AgeAtIncident))) +
+  geom_bar() + coord_flip() + ggtitle("Incident Type for Ages 20 - 24")
+```
+
+Excluding not major incident types and two clients over the age of 30
+
+```{r}
+incidents |>
+  group_by(OptionsNumber) |>
+  summarize(NumberOfIncidents = n()) |>
+  arrange(desc(NumberOfIncidents))
+```
+
+```{r}
+incidents |>
+  group_by(OptionsNumber) |>
+  mutate(NumberOfIncidents = n()) |>
+  ungroup() |>
+  filter(NumberOfIncidents > 40) |>
+  ggplot(aes(x = NumberOfIncidents, fill = IncidentType)) + geom_bar()+ coord_flip() + facet_wrap(~OptionsNumber)
+```
+
+```{r}
+incidents <- incidents |>
+  mutate(IncidentDate = lubridate::as_datetime(IncidentDate),
+         WeekDay = lubridate::wday(IncidentDate, label = TRUE),
+         Month = lubridate::month(IncidentDate, label = TRUE),
+         Year = lubridate::year(IncidentDate),
+         ) 
+```
+
+```{r}
+incidents |>
+  ggplot(aes(x = Month)) + geom_bar() + facet_wrap(~Year)
+```
+
+```{r}
+incidents |>
+  ggplot(aes(x = WeekDay)) + geom_bar() + facet_wrap(~Year)
+```
+
+## CANS Analysis
+
+```{r}
+#cans_last_years
+```
+
+## Cancelled Appointments Analysis
+
+```{r}
+cancelled_apts <- cancelled_apts |>
+  mutate(AgeRange = case_when(
+    AgeAtAppointment <= 5 ~ "0-5",
+    AgeAtAppointment <= 10 ~ "6-9",
+    AgeAtAppointment <= 15 ~ "10-14",
+    AgeAtAppointment <= 20 ~ "15-19",
+    AgeAtAppointment <= 25 ~ "20-24",
+    AgeAtAppointment <= 30 ~ "25-30",
+    AgeAtAppointment <= 35 ~ "31-35",
+    .default = "35+"))
+cancelled_apts |>
+  filter(AgeAtAppointment <= 20) |>
+  ggplot(aes(x = AgeRange, fill = AppointmentStatus)) + geom_bar() + 
+  facet_wrap(~Gender) + ggtitle("Appointment Status for Clients Age 20 and Below")
+```
